@@ -14,6 +14,7 @@ from joblib import Parallel
 import pandas as pd
 
 import sys
+import random
 
 def create_video_folders(dataset, output_dir, tmp_dir):
     """Creates a directory for each label name in the dataset."""
@@ -77,6 +78,7 @@ def download_clip(video_identifier, output_filename,
     # Construct command line for getting the direct video link.
     command = ['youtube-dl',
                '-f', '18', # 640x360 h264 encoded video
+               '--proxy', get_random_proxy(),
                '--get-url',
                '"%s"' % (url_base + video_identifier)]
     command = ' '.join(command)
@@ -162,6 +164,25 @@ def parse_kinetics_annotations(input_csv, ignore_is_cc=False):
             df = df.loc[:, df.columns.tolist()[:-1]]
     return df
 
+def get_random_proxy():
+    try:
+        f = open("proxies.txt", "r")
+    except:
+        print('failed reading proxies.txt file')
+        exit(1)
+    text = f.read()
+    f.close()
+
+    proxies = text.split("\n")
+    proxies.remove('')
+
+    proxy = random.choice(proxies)
+    if not proxy:
+        print('no proxy value')
+        exit(1)
+    else:
+        print('Using {} proxy'.format(proxy), file=sys.stdout)
+    return proxy
 
 def main(input_csv, output_dir,
          trim_format='%06d', num_jobs=24, tmp_dir='/tmp/kinetics',
