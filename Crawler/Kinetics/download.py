@@ -75,10 +75,11 @@ def download_clip(video_identifier, output_filename,
     assert isinstance(output_filename, str), 'output_filename must be string'
     assert len(video_identifier) == 11, 'video_identifier must have length 11'
     status = False
+    proxy=get_random_proxy()
     # Construct command line for getting the direct video link.
     command = ['youtube-dl',
                '-f', '18', # 640x360 h264 encoded video
-               '--proxy', get_random_proxy(),
+               '--proxy', proxy,
                '--get-url',
                '"%s"' % (url_base + video_identifier)]
     command = ' '.join(command)
@@ -91,7 +92,9 @@ def download_clip(video_identifier, output_filename,
                                                           stderr=subprocess.STDOUT)
             direct_download_url = direct_download_url.strip().decode('utf-8')
          except subprocess.CalledProcessError as err:
-            print('{} - {}'.format(video_identifier, err), file=sys.stdout)
+            print('{} - {}, proxy {}'.format(video_identifier, err, proxy), file=sys.stdout)
+            if 429 in err:
+                remove_proxy_from_list(proxy)
             attempts += 1
             if attempts == num_attempts:
                 return status, err.output
@@ -99,7 +102,11 @@ def download_clip(video_identifier, output_filename,
                 continue
          break
     # Construct command to trim the videos (ffmpeg required).
-    command = ['ffmpeg',
+    command = ['http_proxy={}'.format(proxy),
+               'https_proxy={}'.format(proxy),
+               'HTTP_proxy={}'.format(proxy),
+               'HTTPS_proxy={}'.format(proxy),
+               'ffmpeg',
                '-ss', str(start_time),
                '-t', str(end_time - start_time),
                '-i', "'%s'" % direct_download_url,
@@ -113,13 +120,24 @@ def download_clip(video_identifier, output_filename,
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
-        print('{} - {}'.format(video_identifier, err), file=sys.stdout)
+        if 429 in err:
+            remove_proxy_from_list(proxy)
+        print('{} - {} proxy {}'.format(video_identifier, err, proxy), file=sys.stdout)
         return status, err.output
     # Check if the video was successfully saved.
     status = os.path.exists(output_filename)
-    print('{} - downloaded'.format(video_identifier), file=sys.stdout)
+    print('{} - downloaded - proxy: {}'.format(video_identifier,proxy ), file=sys.stdout)
     return status, 'Downloaded'
 
+def remove_proxy_from_list(proxy):
+    with open("proxies.txt", "r") as f:
+        lines = f.readlines()
+    with open("proxies.txt", "w") as f:
+        for line in lines:
+            if line.strip("\n") != proxy:
+                f.write(line)
+    
+  
 
 def download_clip_wrapper(row, label_to_dir, trim_format, tmp_dir):
     """Wrapper for parallel processing purposes."""
