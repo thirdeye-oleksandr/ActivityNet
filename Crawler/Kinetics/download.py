@@ -56,7 +56,8 @@ def download_clip(video_identifier, output_filename,
                   start_time, end_time,
                   tmp_dir='/tmp/kinetics',
                   num_attempts=5,
-                  url_base='https://www.youtube.com/watch?v='):
+                  url_base='https://www.youtube.com/watch?v=',
+                  csv_status_file=None):
     """Download a video from youtube if exists and is not blocked.
     arguments:
     ---------
@@ -97,7 +98,7 @@ def download_clip(video_identifier, output_filename,
                 remove_proxy_from_list(proxy)
             attempts += 1
             if attempts == num_attempts:
-                return status, err.output
+                return status, str(err.output)
             else:
                 continue
          break
@@ -120,10 +121,9 @@ def download_clip(video_identifier, output_filename,
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
-        if 429 in err:
-            remove_proxy_from_list(proxy)
-        print('{} - {} proxy {}'.format(video_identifier, err, proxy), file=sys.stdout)
-        return status, err.output
+        print('{} - {}'.format(video_identifier, err), file=sys.stdout)
+        return status, str(err.output)
+
     # Check if the video was successfully saved.
     status = os.path.exists(output_filename)
     print('{} - downloaded - proxy: {}'.format(video_identifier,proxy ), file=sys.stdout)
@@ -139,7 +139,11 @@ def remove_proxy_from_list(proxy):
     
   
 
-def download_clip_wrapper(row, label_to_dir, trim_format, tmp_dir):
+def download_clip_wrapper(row,
+                          label_to_dir,
+                          trim_format,
+                          tmp_dir,
+                          csv_status_file):
     """Wrapper for parallel processing purposes."""
     output_filename = construct_video_filename(row, label_to_dir,
                                                trim_format)
@@ -151,6 +155,11 @@ def download_clip_wrapper(row, label_to_dir, trim_format, tmp_dir):
     downloaded, log = download_clip(row['video-id'], output_filename,
                                     row['start-time'], row['end-time'],
                                     tmp_dir=tmp_dir)
+    if csv_status_file is not None:
+        with open(csv_status_file, 'a') as f:
+            f.write('\n{}, {}'.format(
+                row['video-id'], str(log)
+            ))
     status = tuple([clip_id, downloaded, log])
     return status
 
@@ -204,7 +213,7 @@ def get_random_proxy():
 
 def main(input_csv, output_dir,
          trim_format='%06d', num_jobs=24, tmp_dir='/tmp/kinetics',
-         drop_duplicates=False):
+         drop_duplicates=False, csv_status_file=None):
 
     # Reading and parsing Kinetics.
     dataset = parse_kinetics_annotations(input_csv)
@@ -221,16 +230,27 @@ def main(input_csv, output_dir,
     # Creates folders where videos will be saved later.
     label_to_dir = create_video_folders(dataset, output_dir, tmp_dir)
 
+    if csv_status_file is not None:
+        if not os.path.exists(csv_status_file):
+            with open(csv_status_file, 'a') as f:
+                f.write('video_identifier, status')
+        status_df = pd.read_csv(csv_status_file)
+        index_values = dataset[dataset['video-id'].isin(
+            status_df.video_identifier.unique())].index
+        dataset = dataset.drop(index_values).reset_index(drop=True)
+
     # Download all clips.
     if num_jobs == 1:
         status_lst = []
         for i, row in dataset.iterrows():
             status_lst.append(download_clip_wrapper(row, label_to_dir,
-                                                    trim_format, tmp_dir))
+                                                    trim_format, tmp_dir,
+                                                    csv_status_file))
     else:
         status_lst = Parallel(n_jobs=num_jobs)(delayed(download_clip_wrapper)(
             row, label_to_dir,
-            trim_format, tmp_dir) for i, row in dataset.iterrows())
+            trim_format, tmp_dir,
+            csv_status_file) for i, row in dataset.iterrows())
 
     # Clean tmp dir.
     shutil.rmtree(tmp_dir)
@@ -257,4 +277,7 @@ if __name__ == '__main__':
     p.add_argument('--drop-duplicates', type=str, default='non-existent',
                    help='Unavailable at the moment')
                    # help='CSV file of the previous version of Kinetics.')
+    p.add_argument('-c', '--csv-status-file', type=str,
+                   help='CSV file containing files that have been already'
+                        'processed')
     main(**vars(p.parse_args()))
