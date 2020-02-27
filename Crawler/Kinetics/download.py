@@ -92,7 +92,7 @@ def download_clip(video_identifier, output_filename,
                                                           stderr=subprocess.STDOUT)
             direct_download_url = direct_download_url.strip().decode('utf-8')
          except subprocess.CalledProcessError as err:
-            if "429" in err.output:
+            if "429" in str(err.output):
                remove_proxy_from_list(proxy)
             print('{} - {}, proxy {}'.format(video_identifier, err, proxy), file=sys.stdout)
             attempts += 1
@@ -120,7 +120,7 @@ def download_clip(video_identifier, output_filename,
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
-        if "429" in err.output:
+        if "429" in str(err.output):
             remove_proxy_from_list(proxy)
         print('{} - {}'.format(video_identifier, err), file=sys.stdout)
         return status, str(err.output)
