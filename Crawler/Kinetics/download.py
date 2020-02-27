@@ -191,7 +191,7 @@ def download_clip_wrapper(row,
     if csv_status_file is not None and error_429_message not in log:
         with open(csv_status_file, 'a') as f:
             f.write('\n{}, {}'.format(
-                row['video-id'], str(log)
+                row['video-id'], str(log).replace(',', '.')
             ))
     status = tuple([clip_id, downloaded, log])
     return status
