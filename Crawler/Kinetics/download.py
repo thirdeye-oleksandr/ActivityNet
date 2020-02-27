@@ -94,8 +94,6 @@ def download_clip(video_identifier, output_filename,
             direct_download_url = direct_download_url.strip().decode('utf-8')
          except subprocess.CalledProcessError as err:
             print('{} - {}, proxy {}'.format(video_identifier, err, proxy), file=sys.stdout)
-            if 429 in err:
-                remove_proxy_from_list(proxy)
             attempts += 1
             if attempts == num_attempts:
                 return status, str(err.output)
@@ -129,14 +127,14 @@ def download_clip(video_identifier, output_filename,
     print('{} - downloaded - proxy: {}'.format(video_identifier,proxy ), file=sys.stdout)
     return status, 'Downloaded'
 
-def remove_proxy_from_list(proxy):
-    with open("proxies.txt", "r") as f:
-        lines = f.readlines()
-    with open("proxies.txt", "w") as f:
-        for line in lines:
-            if line.strip("\n") != proxy:
-                f.write(line)
-    
+#def remove_proxy_from_list(proxy):
+#    with open("proxies.txt", "r") as f:
+#        lines = f.readlines()
+#    with open("proxies.txt", "w") as f:
+#        for line in lines:
+#            if line.strip("\n") != proxy:
+#                f.write(line)
+#    
   
 
 def download_clip_wrapper(row,
