@@ -92,6 +92,8 @@ def download_clip(video_identifier, output_filename,
                                                           stderr=subprocess.STDOUT)
             direct_download_url = direct_download_url.strip().decode('utf-8')
          except subprocess.CalledProcessError as err:
+            if "429" in err.output:
+               remove_proxy_from_list(proxy)
             print('{} - {}, proxy {}'.format(video_identifier, err, proxy), file=sys.stdout)
             attempts += 1
             if attempts == num_attempts:
@@ -118,6 +120,8 @@ def download_clip(video_identifier, output_filename,
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
+        if "429" in err.output:
+            remove_proxy_from_list(proxy)
         print('{} - {}'.format(video_identifier, err), file=sys.stdout)
         return status, str(err.output)
 
@@ -126,14 +130,44 @@ def download_clip(video_identifier, output_filename,
     print('{} - downloaded - proxy: {}'.format(video_identifier,proxy ), file=sys.stdout)
     return status, 'Downloaded'
 
-#def remove_proxy_from_list(proxy):
-#    with open("proxies.txt", "r") as f:
-#        lines = f.readlines()
-#    with open("proxies.txt", "w") as f:
-#        for line in lines:
-#            if line.strip("\n") != proxy:
-#                f.write(line)
-#
+def get_random_proxy():
+    try:
+        f = open("proxies.txt", "r")
+    except:
+        print('failed reading proxies.txt file')
+        exit(1)
+    text = f.read()
+    f.close()
+
+    proxies = text.split("\n")
+    proxies.remove('')
+
+    proxy = random.choice(proxies)
+    if not proxy:
+        print('no proxy value')
+        exit(1)
+    else:
+        print('Using {} proxy'.format(proxy), file=sys.stdout)
+    return proxy
+
+def remove_proxy_from_list(proxy):
+    with open("proxies.txt", "r") as f:
+        lines = f.readlines()
+    with open("proxies.txt", "w") as f:
+        for line in lines:
+            if line.strip("\n") != proxy:
+                f.write(line)
+    disable_squid_on_srv(proxy)
+
+
+def disable_squid_on_srv(proxy):
+    import subprocess
+    ip= proxy.strip("https://").split(":")[0]
+    ssh_command = "ssh {}".format(ip)
+    stop = ["ssh","-o", "StrictHostKeychecking=no", ip, "sudo", "systemctl" ,"stop", "squid"]
+    disable = ["ssh", "-o", "StrictHostKeychecking=no", ip, "sudo", "systemctl" ,"disable", "squid"]
+    subprocess.run(stop)
+    subprocess.run(disable)
 
 
 def download_clip_wrapper(row,
@@ -190,25 +224,6 @@ def parse_kinetics_annotations(input_csv, ignore_is_cc=False):
             df = df.loc[:, df.columns.tolist()[:-1]]
     return df
 
-def get_random_proxy():
-    try:
-        f = open("proxies.txt", "r")
-    except:
-        print('failed reading proxies.txt file')
-        exit(1)
-    text = f.read()
-    f.close()
-
-    proxies = text.split("\n")
-    proxies.remove('')
-
-    proxy = random.choice(proxies)
-    if not proxy:
-        print('no proxy value')
-        exit(1)
-    else:
-        print('Using {} proxy'.format(proxy), file=sys.stdout)
-    return proxy
 
 def main(input_csv, output_dir,
          trim_format='%06d', num_jobs=24, tmp_dir='/tmp/kinetics',
