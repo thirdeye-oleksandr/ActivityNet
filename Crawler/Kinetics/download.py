@@ -56,8 +56,7 @@ def download_clip(video_identifier, output_filename,
                   start_time, end_time,
                   tmp_dir='/tmp/kinetics',
                   num_attempts=5,
-                  url_base='https://www.youtube.com/watch?v=',
-                  csv_status_file=None):
+                  url_base='https://www.youtube.com/watch?v='):
     """Download a video from youtube if exists and is not blocked.
     arguments:
     ---------
@@ -134,8 +133,8 @@ def download_clip(video_identifier, output_filename,
 #        for line in lines:
 #            if line.strip("\n") != proxy:
 #                f.write(line)
-#    
-  
+#
+
 
 def download_clip_wrapper(row,
                           label_to_dir,
@@ -153,7 +152,9 @@ def download_clip_wrapper(row,
     downloaded, log = download_clip(row['video-id'], output_filename,
                                     row['start-time'], row['end-time'],
                                     tmp_dir=tmp_dir)
-    if csv_status_file is not None:
+
+    error_429_message = "HTTP Error 429: Too Many Requests"
+    if csv_status_file is not None and error_429_message not in log:
         with open(csv_status_file, 'a') as f:
             f.write('\n{}, {}'.format(
                 row['video-id'], str(log)
