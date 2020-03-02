@@ -157,17 +157,6 @@ def remove_proxy_from_list(proxy):
         for line in lines:
             if line.strip("\n") != proxy:
                 f.write(line)
-    disable_squid_on_srv(proxy)
-
-
-def disable_squid_on_srv(proxy):
-    import subprocess
-    ip= proxy.strip("https://").split(":")[0]
-    ssh_command = "ssh {}".format(ip)
-    stop = ["ssh","-o", "StrictHostKeychecking=no", ip, "sudo", "systemctl" ,"stop", "squid"]
-    disable = ["ssh", "-o", "StrictHostKeychecking=no", ip, "sudo", "systemctl" ,"disable", "squid"]
-    subprocess.run(stop)
-    subprocess.run(disable)
 
 
 def download_clip_wrapper(row,
